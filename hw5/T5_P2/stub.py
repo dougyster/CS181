@@ -4,7 +4,7 @@ import numpy.random as npr
 import pygame as pg
 
 # uncomment this for animation
-# from SwingyMonkey import SwingyMonkey
+from SwingyMonkey import SwingyMonkey
 
 # uncomment this for no animation
 from SwingyMonkeyNoAnimation import SwingyMonkey
@@ -26,6 +26,9 @@ class Learner(object):
         self.last_action = None
         self.last_reward = None
 
+        self.alpha = 0.2
+        self.gamma = 0.9
+        self.epilson = 0.3
         # We initialize our Q-value grid that has an entry for each action and state.
         # (action, rel_x, rel_y)
         self.Q = np.zeros((2, X_SCREEN // X_BINSIZE, Y_SCREEN // Y_BINSIZE))
@@ -51,14 +54,22 @@ class Learner(object):
         Implement this function to learn things and take actions.
         Return 0 if you don't want to jump and 1 if you do.
         """
+        new_state = self.discretize_state(state)
 
-        # TODO (currently monkey just jumps around randomly)
-        # 1. Discretize 'state' to get your transformed 'current state' features.
-        # 2. Perform the Q-Learning update using 'current state' and the 'last state'.
-        # 3. Choose the next action using an epsilon-greedy policy.
+        # received help from Wenyun Wang
+        if self.last_state is not None:
+            td = (
+                self.last_reward
+                + self.gamma
+                * np.max([self.Q[action][new_state] for action in range(2)])
+                - self.Q[self.last_action][self.last_state]
+            )
+            self.Q[self.last_action][self.last_state] += self.alpha * td
 
-        new_action = npr.rand() < 0.1
-        new_state = state
+        if npr.rand() < self.epilson:
+            new_action = npr.randint(0, 2)
+        else:
+            new_action = np.argmax([self.Q[action][new_state] for action in range(2)])
 
         self.last_action = new_action
         self.last_state = new_state
@@ -71,17 +82,20 @@ class Learner(object):
         self.last_reward = reward
 
 
-def run_games(learner, hist, iters=100, t_len=100):
+def run_games(learner, hist, iters=100, t_len=100, epilson=0.5):
     """
     Driver function to simulate learning by having the agent play a sequence of games.
     """
     for ii in range(iters):
+        learner.epilson *= epilson
         # Make a new monkey object.
-        swing = SwingyMonkey(sound=False,  # Don't play sounds.
-                             text="Epoch %d" % (ii),  # Display the epoch on screen.
-                             tick_length=t_len,  # Make game ticks super fast.
-                             action_callback=learner.action_callback,
-                             reward_callback=learner.reward_callback)
+        swing = SwingyMonkey(
+            sound=False,  # Don't play sounds.
+            text="Epoch %d" % (ii),  # Display the epoch on screen.
+            tick_length=t_len,  # Make game ticks super fast.
+            action_callback=learner.action_callback,
+            reward_callback=learner.reward_callback,
+        )
 
         # Loop until you hit something.
         while swing.game_loop():
@@ -96,7 +110,7 @@ def run_games(learner, hist, iters=100, t_len=100):
     return
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Select agent.
     agent = Learner()
 
@@ -107,5 +121,5 @@ if __name__ == '__main__':
     run_games(agent, hist, 100, 100)
     print(hist)
 
-    # Save history. 
-    np.save('hist', np.array(hist))
+    # Save history.
+    np.save("hist", np.array(hist))
